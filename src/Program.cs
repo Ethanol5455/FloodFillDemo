@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections;
+using System.Numerics;
+using System.Text;
+using ReturnTypes;
 
 namespace FloodFill
 {
     class FloodFill
     {
-        private static void FillFromPoint(int thisX, int thisY, int id, bool targetValue, bool[,] inputMap, ref Optional<int>[,] outputMap)
+        private static void FillFromPointRecursive(int thisX, int thisY, int id, bool targetValue, bool[,] inputMap, ref Optional<int>[,] outputMap)
         {
             if (thisX < 0 || thisY < 0
                 || thisX >= inputMap.GetLength(0) || thisY >= inputMap.GetLength(1)
@@ -14,86 +17,128 @@ namespace FloodFill
                 return;
             outputMap[thisX, thisY].Set(id);
 
-            FillFromPoint(thisX + 1, thisY, id, targetValue, inputMap, ref outputMap);
-            FillFromPoint(thisX - 1, thisY, id, targetValue, inputMap, ref outputMap);
-            FillFromPoint(thisX, thisY + 1, id, targetValue, inputMap, ref outputMap);
-            FillFromPoint(thisX, thisY - 1, id, targetValue, inputMap, ref outputMap);
+            FillFromPointRecursive(thisX + 1, thisY, id, targetValue, inputMap, ref outputMap);
+            FillFromPointRecursive(thisX - 1, thisY, id, targetValue, inputMap, ref outputMap);
+            FillFromPointRecursive(thisX, thisY + 1, id, targetValue, inputMap, ref outputMap);
+            FillFromPointRecursive(thisX, thisY - 1, id, targetValue, inputMap, ref outputMap);
         }
 
-        public static Optional<int>[,] SolveFloodFill(bool[,] inputMap)
+        public static int[,] SolveFloodFill(bool[,] inputMap)
         {
-            Optional<int>[,] idMap = new Optional<int>[inputMap.GetLength(0), inputMap.GetLength(1)];
+            Optional<int>[,] idMapOptional = new Optional<int>[inputMap.GetLength(0), inputMap.GetLength(1)];
             int id = 0;
 
             for (int i = 0; i < inputMap.GetLength(0); i++)
             {
-                for (int j = 0; j < inputMap.GetLength(0); j++)
+                for (int j = 0; j < inputMap.GetLength(1); j++)
                 {
-                    if (!idMap[i, j].HasValue)
+                    if (!idMapOptional[i, j].HasValue)
                     {
-                        FillFromPoint(i, j, id, inputMap[i, j], inputMap, ref idMap);
+                        FillFromPointRecursive(i, j, id, inputMap[i, j], inputMap, ref idMapOptional);
                         id++;
                     }
                 }
             }
 
+            int[,] idMap = new int[inputMap.GetLength(0), inputMap.GetLength(1)];
 
-            // Console.WriteLine(id);
-            // FillFromPoint((0, 0), ref id, inputMap, ref idMap);
-            // Console.WriteLine(id);
+            for (int i = 0; i < inputMap.GetLength(0); i++)
+            {
+                for (int j = 0; j < inputMap.GetLength(1); j++)
+                {
+                    idMap[i, j] = idMapOptional[i, j].Value;
+                }
+            }
+
             return idMap;
+        }
+
+        public static Result<bool[,], IOException> ReadMapFromFile(string inPath)
+        {
+            List<bool[]> map = [];
+            Optional<char> firstChar = new();
+            Optional<char> secondChar = new();
+            var lines = File.ReadLines(inPath);
+            foreach (string line in lines)
+            {
+                if (map.Count > 0 && line.Length != map[0].Length)
+                    return new Result<bool[,], IOException>(new IOException("Line lengths are not equal"));
+                bool[] lineValues = new bool[line.Length];
+                for (int i = 0; i < line.Length; i++)
+                {
+                    char c = line[i];
+                    if (firstChar.IsSome())
+                    {
+                        if (secondChar.IsSome())
+                        {
+                            if (c != secondChar.Value && c != firstChar.Value)
+                            {
+                                return new Result<bool[,], IOException>(new IOException($"More than two distinct characters in input file!\nFirst char is {firstChar}\nSecond char is {secondChar}\nThird char is \"{c}\")"));
+                            }
+                        }
+                        else if (c != firstChar.Value)
+                        {
+                            secondChar.Set(c);
+                        }
+                    }
+                    else
+                    {
+                        firstChar.Set(c);
+                    }
+
+                    lineValues[i] = c == firstChar.Value;
+                }
+                map.Add(lineValues);
+            }
+
+            bool[,] arrayMap = new bool[map.Count, map[0].Length];
+
+            for (int i = 0; i < map.Count; i++)
+            {
+                for (int j = 0; j < map[i].Length; j++)
+                {
+                    arrayMap[i, j] = map[i][j];
+                }
+            }
+
+            return new Result<bool[,], IOException>(arrayMap);
+        }
+
+        public static void WriteMapToFile(string outPath, int[,] outputMap)
+        {
+            var file = new StreamWriter(outPath);
+            for (int i = 0; i < outputMap.GetLength(0); i++)
+            {
+                var builder = new StringBuilder();
+                for (int j = 0; j < outputMap.GetLength(1); j++)
+                {
+                    builder.Append(outputMap[i, j]);
+                    if (j != outputMap.GetLength(1) - 1)
+                        builder.Append(' ');
+                }
+                if (i != outputMap.GetLength(0) - 1)
+                    builder.AppendLine();
+                file.Write(builder.ToString());
+            }
+            file.Close();
         }
     }
 
     class Program
     {
-        static void Main(string[] args)
+        static int Main()
         {
-            bool[,] map = { { false, false }, { true, true } };
-            Console.WriteLine($"{map[0, 0]}");
-            Optional<int>[,] outputMap = FloodFill.SolveFloodFill(map);
-            Console.WriteLine($"{outputMap[0, 0]} {outputMap[0, 1]}");
-            Console.WriteLine($"{outputMap[1, 0]} {outputMap[1, 1]}");
-        }
-    }
-
-    struct Optional<T>
-    {
-        private T _value;
-        public bool HasValue { get; private set; }
-
-        public Optional()
-        {
-            HasValue = false;
-        }
-
-        public Optional(T value)
-        {
-            Set(value);
-        }
-
-        public void Set(T value)
-        {
-            _value = value;
-            HasValue = value != null;
-        }
-
-        public T Value
-        {
-            get
+            var readResult = FloodFill.ReadMapFromFile("demo_files/zero_one.ffin");
+            if (readResult.IsError)
             {
-                if (!HasValue)
-                    throw new InvalidOperationException("No value present");
-                return _value;
+                Console.Error.WriteLine($"Could not read input map with error {readResult.Value}");
+                return -1;
             }
+            int[,] outputMap = FloodFill.SolveFloodFill(readResult.Value);
+            FloodFill.WriteMapToFile("demo_files/zero_one.ffout", outputMap);
+
+            return 0;
         }
-
-        public bool IsSome() => HasValue;
-
-        public bool IsNone() => !HasValue;
-
-        public T GetOrDefault(T defaultValue = default) => HasValue ? _value : defaultValue;
-
-        public override string ToString() => HasValue ? $"Some({_value.ToString()})" : "None";
     }
+
 }
