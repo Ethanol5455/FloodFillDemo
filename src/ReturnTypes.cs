@@ -1,5 +1,10 @@
 namespace ReturnTypes
 {
+    struct Empty
+    {
+        public override readonly string ToString() => "()";
+    }
+
     struct Result<T, E>
     {
         private T _value;

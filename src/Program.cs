@@ -104,23 +104,32 @@ namespace FloodFill
             return new Result<bool[,], IOException>(arrayMap);
         }
 
-        public static void WriteMapToFile(string outPath, int[,] outputMap)
+        public static Result<Empty, Exception> WriteMapToFile(string outPath, int[,] outputMap)
         {
-            var file = new StreamWriter(outPath);
-            for (int i = 0; i < outputMap.GetLength(0); i++)
+            try
             {
-                var builder = new StringBuilder();
-                for (int j = 0; j < outputMap.GetLength(1); j++)
+                using StreamWriter file = new(outPath);
+                for (int i = 0; i < outputMap.GetLength(0); i++)
                 {
-                    builder.Append(outputMap[i, j]);
-                    if (j != outputMap.GetLength(1) - 1)
-                        builder.Append(' ');
+                    var builder = new StringBuilder();
+                    for (int j = 0; j < outputMap.GetLength(1); j++)
+                    {
+                        builder.Append(outputMap[i, j]);
+                        if (j != outputMap.GetLength(1) - 1)
+                            builder.Append(' ');
+                    }
+                    if (i != outputMap.GetLength(0) - 1)
+                        builder.AppendLine();
+                    file.Write(builder.ToString());
                 }
-                if (i != outputMap.GetLength(0) - 1)
-                    builder.AppendLine();
-                file.Write(builder.ToString());
+
+                return new Result<Empty, Exception>(new Empty());
             }
-            file.Close();
+            catch (Exception e)
+            {
+                return new Result<Empty, Exception>(e);
+            }
+
         }
     }
 
@@ -131,11 +140,16 @@ namespace FloodFill
             var readResult = FloodFill.ReadMapFromFile("demo_files/zero_one.ffin");
             if (readResult.IsError)
             {
-                Console.Error.WriteLine($"Could not read input map with error {readResult.Value}");
+                Console.Error.WriteLine($"Could not read input map with error {readResult.Error}");
                 return -1;
             }
             int[,] outputMap = FloodFill.SolveFloodFill(readResult.Value);
-            FloodFill.WriteMapToFile("demo_files/zero_one.ffout", outputMap);
+            var writeResult = FloodFill.WriteMapToFile("demo_files/zero_one.ffout", outputMap);
+            if (writeResult.IsError)
+            {
+                Console.Error.WriteLine($"Could not write output map with error {readResult.Error}");
+                return -1;
+            }
 
             return 0;
         }
